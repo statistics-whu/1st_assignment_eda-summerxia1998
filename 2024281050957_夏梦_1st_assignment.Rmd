@@ -1,0 +1,237 @@
+---
+title: "链家武汉二手房数据分析报告"
+CJKmainfont: 华文楷体
+author: "2024281050957_夏梦"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+  word_document:
+    toc: yes
+  html_document:
+    code_folding: show
+    fig_caption: yes
+    fig_width: 10
+    highlight: tango
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+---
+```{r setup, include = FALSE,echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE,error = FALSE, warning = FALSE, message = FALSE,
+                      out.width = "100%", split = FALSE, fig.align = "center")
+#load library
+library(tidyverse)
+library(kableExtra)
+library(lubridate)
+library(scales)
+library(plotly)
+library(patchwork)
+library(ggrepel)
+library(ggplot2)
+library(extrafont)
+library(knitr)
+library(rmarkdown)
+library(grid)
+library(gridExtra)
+library(showtext)
+showtext_auto(enable = TRUE)
+```
+
+# 你的主要发现
+
+1. 二手房的总价和每平方米价格在不同区域和物业类型之间有较大差异。总价从几十万到几百万不等，每平方米价格从几千元到几万元不等，显示出武汉二手房市场的多样性。
+
+2. 武汉的各个区域（如南湖沃尔玛、光谷东、二七等）二手房价格存在明显差异。一些区域如光谷东和南湖沃尔玛的二手房价格较高，可能与这些区域的经济发展、基础设施建设和居住环境有关。
+  
+3. 房屋的装修状况（decoration）包括精装、简装、毛坯等，这直接影响房屋的售价和吸引力。精装房通常价格较高，但更受买家欢迎，尤其是那些希望立即入住的买家。
+    
+
+# 数据介绍
+
+本报告**链家**数据获取方式如下：
+    
+报告人在2023年9月12日获取了[链家武汉二手房网站](https://wh.lianjia.com/ershoufang/)数据。
+    
+- 链家二手房网站默认显示100页，每页30套房产，因此本数据包括3000套房产信息；
+    
+- 数据包括了页面可见部分的文本信息，具体字段及说明见作业说明。
+
+ **说明：**数据仅用于教学；由于不清楚链家数据的展示规则，因此数据可能并不是武汉二手房市场的随机抽样，结论很可能有很大的偏差，甚至可能是错误的。
+    
+```{r}
+# 载入数据和预处理
+lj<- read_csv("/Users/xiameng/Desktop/science\ analytics/数据思维与商业统计/Data/2023-09-12_cleaned.csv")
+# EDA ---------------------------------------------------------------------
+
+## 如下语句可以解决画图中的中文显示问题，当然你可以用showtext包来解决
+theme_set(theme(text = element_text(family="Songti SC",size = 10))) #这里family设置成你系统中的中文字体名。
+
+# 做一些数据预处理，比如把字符型变成factor。
+lj <- lj %>%
+  mutate(across(where(is.character), as.factor))
+
+```
+
+\newpage
+
+# 数据概览
+
+数据表（lj)共包括`r names(lj)`等`r ncol(lj)`个变量,共`r nrow(lj)`行。表的前10行示例如下：
+```{r results='asis'}
+lj %>% 
+  head(10) %>%
+  kable(caption = "武汉链家二手房") %>% 
+  kable_styling(full_width = FALSE)
+```
+
+##各变量的简短信息：
+```{r}
+glimpse(lj)
+```
+
+##各变量的简短统计：
+```{r}
+summary(lj)
+```
+
+可以看到：武汉链家2023/09的3000个二手房市场中
+
+- 房屋总价：最高值1380万元，最低价10.6万元，中位数值137万元，平均价格155.9万元；
+
+- 房屋单价：最高价44656元/$m^2$，最低价1771元/$m^2$，中位数值14404元/$m^2$，平均价格15148/$m^2$元；
+
+- 建筑面积在10.6$m^2$～1380$m^2$之间，平均建筑面积155.9$m^2$；房型集中为二室一厅、三室一厅、三室两厅；主要是南北朝向的房型；
+
+- 在白沙洲、盘龙城、四新、光谷东、金银湖、后湖这几个区域的二手房较多；板楼有1781套，塔楼527套，板塔结合615套；
+
+
+\newpage
+
+# 探索性分析
+
+## 1、房屋总价和单价的关系
+```{r}
+lj %>% 
+  ggplot() +
+    geom_point(aes(x = price_sqm, y = price_ttl, color =  property_style,
+                   group = property_region)) +
+    geom_smooth(aes(x = price_sqm, y = price_ttl))+
+    labs(title = "房屋单价与总价的关系",
+         x = "房屋单价（元）", y = "房屋总价(万元)")+
+   scale_color_discrete(name = "建筑形式")+
+   theme(plot.title = element_text(hjust = 0.5))
+```
+**结论**：房屋总价与单价整体呈正相关（除极端值）；板塔结合的房型面积普遍大于塔楼和平房；
+
+
+## 2、房屋特征与价格的关系
+
+```{r}
+ggplot(lj,aes(x =bedrooms , y =price_sqm, color = factor(decoration))) +
+geom_point()+
+facet_wrap(~ livingrooms, nrow = 1)+
+labs(title = "不同装修下，房型与价格的关系", x = "卧室数量",y ="房屋单价")+
+scale_color_discrete(name = "装修情况")+
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+**结论**：房型主要是三室两厅、两室一厅。相同房型下，精装房的价格大于简装和毛坯房；与大众认知保持一致；
+
+## 3、各区域房屋单价分布情况
+
+```{r}
+# 销售数量前10的区域
+lj_top_region <- lj %>%
+  group_by(property_region) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))%>%
+  top_n(10, count)
+
+## 查看top10区域的在售房屋数量分布
+lj_top_region %>% 
+  ggplot(aes(x = count, y = reorder(property_region, count),
+             fill = property_region)) +
+    geom_bar(stat = 'identity') +
+    scale_color_discrete(name = "所处区域")+
+    labs(title = "出售数量top10区域",  x = "二手房数量",  y = "区域")
+
+
+# 查看区域房屋单价的箱线图
+lj_top_10 <- dplyr::filter(lj, property_region %in% lj_top_region$property_region)
+
+ggplot(lj_top_10) +
+  geom_boxplot(aes(x = property_region, y = price_sqm, color = property_region)) +
+  labs(title = "出售数量top10区域房屋总价分布情况",  x = "所处区域",  y = "房屋单价")+
+  scale_color_discrete(name = "所处区域")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+**结论**：
+二手房数量最多的几个区域中，武汉在售小区数量前10的区域主要集中在郊区，位置偏远；
+其中，盘龙城的房屋单价比较集中，代表差异性不大；光谷东、王家湾、青山的数据离散程度较高，其中青山的数据偏向性较大。
+
+
+
+## 4、热度最高的小区与是否靠近地铁的相关性
+
+```{r}
+# 关注度前30的小区
+lj_follower_30<- lj  %>% 
+  arrange(desc(followers)) %>% 
+  head(30)
+
+# 查看区域房屋单价的箱线图
+ggplot(lj_follower_30,aes(x=followers,y=reorder(property_name,followers)))+
+              geom_segment(aes(yend=reorder(property_name,followers),colour=near_subway),xend=0,size=2)+ geom_point(size=2)+theme_bw()+ labs(title="武汉最受关注的小区TOP30",x="关注人数", y = "小区名称")+ theme(legend.position=c(1,0.5))+ 
+theme(axis.text.y = element_text(size = 5, color = "black"))+ 
+scale_color_discrete(name = "是否靠近地铁")+
+theme(plot.title = element_text(hjust = 0.5))
+
+      
+```
+
+**结论**：其中最受欢迎的楼盘为十里和府，但它们的热度与是否靠近地铁的相关性不高。
+
+
+## 5、房本是否满2年的价格差异分析
+```{r}
+lj_200 <- filter(lj,building_area <= 200) 
+ggplot(lj_200) +
+geom_smooth(mapping = aes(x = building_area, y =price_ttl,color = if_2y))+labs(
+    title = "房价与房屋建筑面积、房本是否满两年的关系", x = "房屋建筑面积",y ="房屋总价")+
+scale_color_discrete(name = "房本是否满两年")+
+theme(plot.title = element_text(hjust = 0.5))
+```
+**结论**：
+a、在125$m^2$以内，房本无论是否满两年，房屋总价都是一致的；在大面积房型中，房屋建筑面积大于125$m^2$时，在相同的房屋建筑面积下，房本满两年的房屋总价明显高于未满两年的。
+b、对于大面积户型，尤其是改善型住房需求，通常更倾向于购买房本满两年的房屋。这类房屋交易时，购房者无需承担额外的税费，这使得其在价格上更具吸引力，从而导致总价相对较高。
+
+
+
+
+\newpage
+
+# 发现总结
+
+    
+- 区域市场分析
+热门区域
+中心城区：如武昌的中南、东湖东亭，汉口的王家湾、江汉路等区域，交通便利，配套完善，商业和文化资源丰富，因此房价相对较高，市场需求也较大。
+新兴区域：如光谷东、四新等区域，随着城市的发展和基础设施的完善，房价呈现上涨趋势，吸引了不少购房者的关注。
+相对冷门区域
+远城区：一些远城区的房源供应较多，但由于交通不便、配套设施不完善等原因，市场需求相对较低，房价也相对较低。
+
+- 房屋类型与装修状况
+房屋类型：市场上既有高层建筑也有低层住宅，板楼和塔楼并存，满足不同购房者的居住需求。
+装修情况：精装修和简装修的房子占比较大，而毛坯房也占有一定比例。这说明购房者对于是否需要自己进行装修有着不同的偏好。
+
+- 优势
+交通便利性：许多房源标注了“近地铁”的标签，显示出交通便利是影响房价的重要因素之一。
+房屋状态：部分房源提到“房本满两年”，意味着这些房产在出售时可以免征增值税，对于买家来说是一个额外的优势。
+看房便利度：几乎所有房源都标注了“随时看房”，部分还提供“VR看装修”服务，表明卖家愿意提供便利条件吸引潜在买家。
+
+综上所述，武汉当前的二手房市场呈现出多样化的特点，购房者和投资者可以根据自己的需求和经济实力进行选择。同时，市场也受到政策、经济等因素的影响，需要密切关注市场动态，做出明智的决策。
+
+
+
